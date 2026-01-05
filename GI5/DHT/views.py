@@ -135,12 +135,22 @@ def liste_incidents(request):
     
     operateurs = Operateur.objects.filter(actif=True)
     
+    # Calculer les statistiques
+    total_incidents = Incident.objects.count()
+    incidents_ouverts = Incident.objects.filter(statut='ouvert').count()
+    incidents_en_cours = Incident.objects.filter(statut='en_cours').count()
+    incidents_resolus = Incident.objects.filter(statut='resolu').count()
+    
     context = {
         'incidents': incidents,
         'operateurs': operateurs,
         'statut_filter': statut_filter,
         'operateur_filter': operateur_filter,
         'operateur_connecte': operateur_connecte,
+        'total_incidents': total_incidents,
+        'incidents_ouverts': incidents_ouverts,
+        'incidents_en_cours': incidents_en_cours,
+        'incidents_resolus': incidents_resolus,
     }
     return render(request, 'gestion_incidents/liste.html', context)
 

@@ -46,13 +46,13 @@
 
     <div class="card">
         <div class="card-title">Tester l'API (POST)</div>
-        <form id="manual-form">
+        <form id="manual-form" style="flex: 1; display: flex; flex-direction: column;">
             {% csrf_token %}
             <label>Température (°C)</label>
             <input type="number" step="0.1" id="manual-temp" required>
             <label>Humidité (%)</label>
             <input type="number" step="0.1" id="manual-hum" required>
-            <button type="submit">Envoyer vers /api/post/</button>
+            <button type="submit" style="margin-top: auto;">Envoyer vers /api/post/</button>
         </form>
         <div id="manual-result" class="time"></div>
     </div>
