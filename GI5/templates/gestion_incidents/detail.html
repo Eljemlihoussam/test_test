@@ -1,0 +1,313 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détails Incident #{{ incident.id }} - DHT11</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <style>
+        .detail-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .incident-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .incident-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+        .info-item label {
+            display: block;
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .info-item .value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #111827;
+        }
+        .badge-statut {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .badge-ouvert { background: #fef3c7; color: #92400e; }
+        .badge-en_cours { background: #dbeafe; color: #1e40af; }
+        .badge-resolu { background: #d1fae5; color: #065f46; }
+        .badge-ferme { background: #e5e7eb; color: #374151; }
+        .actions-section {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .actions-section h3 {
+            margin-top: 0;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 1rem;
+        }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-success { background: #16a34a; color: white; }
+        .btn-success:hover { background: #15803d; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #4b5563; }
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-family: inherit;
+            font-size: 1rem;
+            min-height: 100px;
+            margin-top: 10px;
+        }
+        .commentaires-section {
+            margin-top: 20px;
+        }
+        .commentaire-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #2563eb;
+        }
+        .tentatives-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .tentative-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e5e7eb;
+        }
+        .tentative-card.active {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        .tentative-card h4 {
+            margin: 0 0 10px 0;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        .tentative-card .count {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #111827;
+        }
+    </style>
+</head>
+<body>
+    <div class="detail-container">
+        <div class="nav-links">
+            <a href="{% url 'liste_incidents' %}">← Retour à la liste</a>
+            {% if user.is_authenticated %}
+                <span style="margin: 0 10px;">|</span>
+                <a href="{% url 'admin:index' %}">Interface Admin</a>
+                {% if user.is_superuser %}
+                    <span style="margin: 0 10px;">|</span>
+                    <span style="color: #f59e0b; font-weight: bold;">🔑 Mode Admin (vous pouvez modifier tous les incidents)</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
+        {% if messages %}
+            <div style="margin-bottom: 20px;">
+                {% for message in messages %}
+                    <div style="padding: 12px; border-radius: 8px; margin-bottom: 10px; 
+                        {% if message.tags == 'error' %}background: #fee2e2; color: #991b1b;
+                        {% elif message.tags == 'warning' %}background: #fef3c7; color: #92400e;
+                        {% else %}background: #d1fae5; color: #065f46;{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="incident-card">
+            <div class="incident-header">
+                <div>
+                    <h1>Incident #{{ incident.id }}</h1>
+                    <span class="badge-statut badge-{{ incident.statut }}">
+                        {{ incident.get_statut_display }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Type d'incident</label>
+                    <div class="value">{{ incident.get_type_incident_display }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Température mesurée</label>
+                    <div class="value">{{ incident.temperature }}°C</div>
+                </div>
+                <div class="info-item">
+                    <label>Date de création</label>
+                    <div class="value">{{ incident.date_creation|date:"d/m/Y H:i:s" }}</div>
+                </div>
+                <div class="info-item">
+                    <label>Opérateur actuel</label>
+                    <div class="value">
+                        {% if incident.operateur_actuel %}
+                            {{ incident.operateur_actuel.nom }}<br>
+                            <small style="color: #6b7280;">Opérateur {{ incident.operateur_actuel.ordre_escalade }}</small>
+                        {% else %}
+                            <span style="color: #9ca3af;">Non assigné</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-item">
+                    <label>Accusé de réception</label>
+                    <div class="value">
+                        {% if incident.accuse_reception %}
+                            ✅ Oui ({{ incident.date_accuse_reception|date:"d/m/Y H:i" }})
+                        {% else %}
+                            ❌ Non
+                        {% endif %}
+                    </div>
+                </div>
+                {% if incident.date_resolution %}
+                <div class="info-item">
+                    <label>Date de résolution</label>
+                    <div class="value">{{ incident.date_resolution|date:"d/m/Y H:i:s" }}</div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tentatives -->
+            <div class="tentatives-info">
+                <div class="tentative-card {% if incident.operateur_actuel and incident.operateur_actuel.ordre_escalade == 1 %}active{% endif %}">
+                    <h4>Opérateur 1</h4>
+                    <div class="count">{{ incident.tentatives_operateur1 }}/3</div>
+                </div>
+                <div class="tentative-card {% if incident.operateur_actuel and incident.operateur_actuel.ordre_escalade == 2 %}active{% endif %}">
+                    <h4>Opérateur 2</h4>
+                    <div class="count">{{ incident.tentatives_operateur2 }}/3</div>
+                </div>
+                <div class="tentative-card {% if incident.operateur_actuel and incident.operateur_actuel.ordre_escalade == 3 %}active{% endif %}">
+                    <h4>Opérateur 3</h4>
+                    <div class="count">{{ incident.tentatives_operateur3 }}/3</div>
+                </div>
+            </div>
+
+            <!-- Commentaires -->
+            {% if incident.commentaires %}
+            <div class="commentaires-section">
+                <h3>Commentaires</h3>
+                <div class="commentaire-item">
+                    <pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">{{ incident.commentaires }}</pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Message d'alerte si pas autorisé -->
+            {% if not peut_modifier and message_erreur %}
+            <div style="background: #fef3c7; color: #92400e; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+                <strong>⚠️ Attention :</strong> {{ message_erreur }}
+                <br><small>Seul l'opérateur assigné peut modifier cet incident.</small>
+            </div>
+            {% endif %}
+
+            <!-- Informations sur l'opérateur connecté -->
+            {% if operateur_connecte %}
+            <div style="background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <strong>👤 Vous êtes connecté en tant que :</strong> {{ operateur_connecte.nom }} (Opérateur {{ operateur_connecte.ordre_escalade }})
+                {% if peut_modifier %}
+                    <span style="color: #16a34a; font-weight: bold;">✓ Vous pouvez modifier cet incident</span>
+                {% else %}
+                    <span style="color: #dc2626; font-weight: bold;">✗ Vous ne pouvez pas modifier cet incident</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="actions-section">
+                <h3>Actions</h3>
+                
+                {% if peut_modifier %}
+                    {% if not incident.accuse_reception %}
+                    <form method="POST" action="{% url 'accuser_reception_incident' incident.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">✅ Accuser réception</button>
+                    </form>
+                    {% endif %}
+
+                    {% if incident.statut != 'resolu' and incident.statut != 'ferme' %}
+                    <form method="POST" action="{% url 'traiter_incident' incident.id %}" style="display: inline-block; margin-left: 10px;">
+                        {% csrf_token %}
+                        <div>
+                            <label for="commentaire-traiter"><strong>Ajouter un commentaire et enregistrer une tentative:</strong></label>
+                            <textarea name="commentaire" id="commentaire-traiter" placeholder="Décrivez l'action effectuée..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-warning">📝 Enregistrer tentative</button>
+                    </form>
+
+                    <form method="POST" action="{% url 'resoudre_incident' incident.id %}" style="display: inline-block; margin-left: 10px;">
+                        {% csrf_token %}
+                        <div>
+                            <label for="commentaire-resoudre"><strong>Résoudre l'incident:</strong></label>
+                            <textarea name="commentaire" id="commentaire-resoudre" placeholder="Commentaire de résolution..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">✅ Résoudre l'incident</button>
+                    </form>
+                    {% endif %}
+                {% else %}
+                    <div style="background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 8px;">
+                        <strong>🔒 Accès restreint</strong>
+                        <p>Vous ne pouvez pas modifier cet incident car vous n'êtes pas l'opérateur assigné.</p>
+                        <p><small>Seul <strong>{{ incident.operateur_actuel.nom }}</strong> peut modifier cet incident.</small></p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

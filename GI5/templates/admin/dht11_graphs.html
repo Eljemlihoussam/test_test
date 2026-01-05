@@ -1,0 +1,383 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Graphiques DHT11 | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .graph-container {
+        background: white;
+        padding: 20px;
+        margin: 20px 0;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .filters {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+    .filters label {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-weight: 600;
+    }
+    .filters input {
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .filters button {
+        padding: 10px 20px;
+        background: #417690;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    .filters button:hover {
+        background: #205067;
+    }
+    .chart-wrapper {
+        margin: 20px 0;
+        position: relative;
+        height: 400px;
+    }
+    .back-link {
+        margin-bottom: 20px;
+    }
+    .back-link a {
+        color: #417690;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .stat-card h3 {
+        margin: 0 0 10px 0;
+        font-size: 0.9rem;
+        opacity: 0.9;
+    }
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="back-link">
+    <a href="{% url 'admin:DHT_dht11_changelist' %}">← Retour à la liste des données DHT11</a>
+</div>
+
+<h1>📊 Graphiques DHT11</h1>
+<p style="color: #666; margin-bottom: 20px;">
+    <strong>Note:</strong> Si aucune donnée n'apparaît, vérifiez que des données existent dans la base de données. 
+    Vous pouvez les ajouter via l'API POST <code>/api/post/</code> ou directement depuis la liste DHT11 dans l'admin.
+</p>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>Température moyenne (24h)</h3>
+        <p class="value" id="avg-temp">--</p>
+    </div>
+    <div class="stat-card">
+        <h3>Humidité moyenne (24h)</h3>
+        <p class="value" id="avg-hum">--</p>
+    </div>
+    <div class="stat-card">
+        <h3>Température max</h3>
+        <p class="value" id="max-temp">--</p>
+    </div>
+    <div class="stat-card">
+        <h3>Température min</h3>
+        <p class="value" id="min-temp">--</p>
+    </div>
+</div>
+
+<div class="graph-container">
+    <h2>🌡️ Graphique Température</h2>
+    <div class="filters">
+        <label>
+            Date de début:
+            <input type="date" id="start-date">
+        </label>
+        <label>
+            Date de fin:
+            <input type="date" id="end-date">
+        </label>
+        <button onclick="loadGraphs()">Charger les données</button>
+        <button onclick="resetFilters()" style="background: #6c757d;">Réinitialiser</button>
+    </div>
+    <div id="loading-msg" style="margin: 10px 0; color: #666; font-style: italic;"></div>
+    <div class="chart-wrapper">
+        <canvas id="temp-chart"></canvas>
+    </div>
+</div>
+
+<div class="graph-container">
+    <h2>💧 Graphique Humidité</h2>
+    <div class="chart-wrapper">
+        <canvas id="hum-chart"></canvas>
+    </div>
+</div>
+
+<div class="graph-container">
+    <h2>📈 Graphique Combiné</h2>
+    <div class="chart-wrapper">
+        <canvas id="combined-chart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let tempChart, humChart, combinedChart;
+
+    function resetFilters() {
+        document.getElementById('start-date').value = '';
+        document.getElementById('end-date').value = '';
+        loadGraphs();
+    }
+
+    async function loadGraphs() {
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        
+        // Afficher un indicateur de chargement
+        const loadingMsg = document.getElementById('loading-msg');
+        if (loadingMsg) loadingMsg.textContent = 'Chargement des données...';
+        
+        const params = new URLSearchParams();
+        if (start) params.append('start', start);
+        if (end) params.append('end', end);
+        
+        try {
+            const url = '/api/' + (params.toString() ? '?' + params.toString() : '');
+            console.log('Chargement des données depuis:', url);
+            
+            const res = await fetch(url);
+            
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status} - ${res.statusText}`);
+            }
+            
+            const data = await res.json();
+            console.log('Données reçues:', data);
+            console.log('Nombre d\'enregistrements:', data.data ? data.data.length : 0);
+            
+            // Vérifier la structure de la réponse
+            if (!data || !data.data) {
+                console.error('Structure de réponse invalide:', data);
+                alert('Erreur: Structure de réponse invalide. Vérifiez la console pour plus de détails.');
+                if (loadingMsg) loadingMsg.textContent = 'Erreur: Structure de réponse invalide';
+                return;
+            }
+            
+            if (data.data.length === 0) {
+                const msg = start || end 
+                    ? `Aucune donnée disponible pour la période sélectionnée (${start || 'début'} - ${end || 'fin'}). Essayez de changer les dates ou cliquez sur "Réinitialiser" pour voir toutes les données.`
+                    : 'Aucune donnée disponible dans la base de données. Veuillez ajouter des données via l\'API POST /api/post/ ou directement depuis la liste DHT11 dans l\'admin.';
+                console.warn(msg);
+                if (loadingMsg) loadingMsg.textContent = msg;
+                // Ne pas afficher d'alert si c'est juste un problème de filtrage
+                if (!start && !end) {
+                    alert(msg);
+                }
+                return;
+            }
+            
+            console.log(`Chargement de ${data.data.length} enregistrement(s)`);
+            if (loadingMsg) loadingMsg.textContent = `${data.data.length} enregistrement(s) chargé(s)`;
+            
+            if (loadingMsg) loadingMsg.textContent = '';
+            
+            const labels = data.data.map(d => new Date(d.dt).toLocaleString());
+            const temps = data.data.map(d => d.temp);
+            const hums = data.data.map(d => d.hum);
+            
+            // Calculer les statistiques
+            const validTemps = temps.filter(t => t !== null && !isNaN(t));
+            const validHums = hums.filter(h => h !== null && !isNaN(h));
+            
+            if (validTemps.length > 0) {
+                const avgTemp = validTemps.reduce((a, b) => a + b, 0) / validTemps.length;
+                const maxTemp = Math.max(...validTemps);
+                const minTemp = Math.min(...validTemps);
+                document.getElementById('avg-temp').textContent = avgTemp.toFixed(1) + '°C';
+                document.getElementById('max-temp').textContent = maxTemp.toFixed(1) + '°C';
+                document.getElementById('min-temp').textContent = minTemp.toFixed(1) + '°C';
+            }
+            
+            if (validHums.length > 0) {
+                const avgHum = validHums.reduce((a, b) => a + b, 0) / validHums.length;
+                document.getElementById('avg-hum').textContent = avgHum.toFixed(1) + '%';
+            }
+            
+            // Graphique Température
+            if (tempChart) tempChart.destroy();
+            const tempCtx = document.getElementById('temp-chart');
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Température (°C)',
+                        data: temps,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Température (°C)' }
+                        },
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 45 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { mode: 'index', intersect: false }
+                    }
+                }
+            });
+            
+            // Graphique Humidité
+            if (humChart) humChart.destroy();
+            const humCtx = document.getElementById('hum-chart');
+            humChart = new Chart(humCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Humidité (%)',
+                        data: hums,
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'Humidité (%)' },
+                            min: 0,
+                            max: 100
+                        },
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 45 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { mode: 'index', intersect: false }
+                    }
+                }
+            });
+            
+            // Graphique Combiné
+            if (combinedChart) combinedChart.destroy();
+            const combinedCtx = document.getElementById('combined-chart');
+            combinedChart = new Chart(combinedCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Température (°C)',
+                            data: temps,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Humidité (%)',
+                            data: hums,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                            yAxisID: 'y1',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Température (°C)' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'Humidité (%)' },
+                            grid: { drawOnChartArea: false }
+                        },
+                        x: {
+                            ticks: { maxRotation: 45, minRotation: 45 }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: true },
+                        tooltip: { mode: 'index', intersect: false }
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('Erreur lors du chargement des données:', error);
+            const errorMsg = `Erreur lors du chargement des données: ${error.message}`;
+            alert(errorMsg);
+            const loadingMsg = document.getElementById('loading-msg');
+            if (loadingMsg) loadingMsg.textContent = errorMsg;
+        }
+    }
+    
+    // Charger les données au chargement de la page
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ne pas définir de dates par défaut - charger toutes les données
+        // L'utilisateur peut ensuite filtrer s'il le souhaite
+        loadGraphs();
+    });
+</script>
+{% endblock %}
+

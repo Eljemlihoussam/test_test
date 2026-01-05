@@ -1,0 +1,79 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Archives des incidents (DHT11)</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+</head>
+<body>
+    <div class="nav-links">
+        <a href="{% url 'dashboard' %}">← Retour au dashboard</a>
+        {% if user.is_authenticated %}
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'admin:index' %}">Interface Admin</a>
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'logout' %}" style="color: #dc2626;">Déconnexion</a>
+        {% else %}
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'login' %}">Connexion Admin</a>
+        {% endif %}
+    </div>
+
+    <div class="page-card">
+        <h2>Archives des incidents (DHT11)</h2>
+        <p class="subtitle">Derniers relevés classés par statut (Normal / Alerte basse / Alerte haute).</p>
+
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Temp (°C)</th>
+                        <th>Hum (%)</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody id="incident-body">
+                    <tr><td colspan="5">Chargement...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const STATUS = (temp) => {
+            if (temp < 2) return { label: "Alerte basse", cls: "badge badge-low" };
+            if (temp > 20) return { label: "Alerte haute", cls: "badge badge-high" };
+            return { label: "Normal", cls: "badge badge-ok" };
+        };
+
+        async function loadIncidents() {
+            const body = document.getElementById("incident-body");
+            try {
+                const res = await fetch("/api/?start=&end=");
+                const data = await res.json();
+                const rows = data.data.slice(-50).reverse().map(item => {
+                    const { label, cls } = STATUS(item.temp);
+                    const dt = new Date(item.dt).toLocaleString();
+                    const temp = item.temp?.toFixed ? item.temp.toFixed(1) : item.temp;
+                    const hum = item.hum?.toFixed ? item.hum.toFixed(1) : item.hum;
+                    return `<tr>
+                        <td>${item.id || ""}</td>
+                        <td>${dt}</td>
+                        <td>${temp}</td>
+                        <td>${hum}</td>
+                        <td><span class="${cls}">${label}</span></td>
+                    </tr>`;
+                }).join("");
+                body.innerHTML = rows || "<tr><td colspan='5'>Aucune donnée</td></tr>";
+            } catch (e) {
+                body.innerHTML = `<tr><td colspan='5'>Erreur : ${e.message}</td></tr>`;
+            }
+        }
+        loadIncidents();
+    </script>
+</body>
+</html>
+

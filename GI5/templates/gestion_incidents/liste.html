@@ -1,0 +1,320 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Incidents - DHT11</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <style>
+        .incidents-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .filters-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            flex-wrap: wrap;
+        }
+        .filters-bar select, .filters-bar button {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 1rem;
+        }
+        .filters-bar button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .filters-bar button:hover {
+            background: #1d4ed8;
+        }
+        .incidents-table {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .incidents-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .incidents-table th {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .incidents-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .incidents-table tr:hover {
+            background: #f9fafb;
+        }
+        .badge-statut {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            display: inline-block;
+        }
+        .badge-ouvert { background: #fef3c7; color: #92400e; }
+        .badge-en_cours { background: #dbeafe; color: #1e40af; }
+        .badge-resolu { background: #d1fae5; color: #065f46; }
+        .badge-ferme { background: #e5e7eb; color: #374151; }
+        .badge-type {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-trop_bas { background: #0ea5e9; color: white; }
+        .badge-trop_haut { background: #dc2626; color: white; }
+        .btn-action {
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: inline-block;
+            margin: 2px;
+        }
+        .btn-view { background: #2563eb; color: white; }
+        .btn-view:hover { background: #1d4ed8; }
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #111827;
+        }
+    </style>
+</head>
+<body>
+    <div class="incidents-container">
+        <div class="nav-links">
+            <a href="{% url 'dashboard' %}">← Retour au dashboard</a>
+            {% if user.is_authenticated %}
+                <span style="margin: 0 10px;">|</span>
+                <a href="{% url 'admin:index' %}">Interface Admin</a>
+                <span style="margin: 0 10px;">|</span>
+                {% if operateur_connecte %}
+                    <span style="color: #6b7280;">Connecté : <strong>{{ operateur_connecte.nom }}</strong> (Op. {{ operateur_connecte.ordre_escalade }})</span>
+                {% endif %}
+            {% else %}
+                <span style="margin: 0 10px;">|</span>
+                <a href="{% url 'login' %}">Connexion Opérateur</a>
+            {% endif %}
+        </div>
+
+        <h1>🚨 Gestion des Incidents</h1>
+
+        <!-- Message d'information sur les permissions -->
+        {% if operateur_connecte %}
+        <div style="background: #dbeafe; color: #1e40af; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #2563eb;">
+            <strong>ℹ️ Information :</strong> Vous êtes connecté en tant que <strong>{{ operateur_connecte.nom }}</strong> (Opérateur {{ operateur_connecte.ordre_escalade }}).
+            <br>Vous pouvez <strong>modifier uniquement les incidents qui vous sont assignés</strong> (lignes en bleu).
+            <br>Les incidents assignés à d'autres opérateurs sont en lecture seule.
+        </div>
+        {% elif user.is_authenticated and user.is_superuser %}
+        <div style="background: #fef3c7; color: #92400e; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+            <strong>🔑 Mode Administrateur :</strong> Vous êtes connecté en tant que superutilisateur.
+            <br>Vous pouvez modifier <strong>tous les incidents</strong> pour la gestion administrative.
+        </div>
+        {% else %}
+        <div style="background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+            <strong>⚠️ Attention :</strong> Vous n'êtes pas connecté en tant qu'opérateur.
+            <br>Pour modifier les incidents, vous devez vous connecter avec un compte opérateur.
+            <br><a href="{% url 'login' %}" style="color: #2563eb; font-weight: bold;">→ Se connecter</a>
+        </div>
+        {% endif %}
+
+        {% if messages %}
+            <div style="margin-bottom: 20px;">
+                {% for message in messages %}
+                    <div style="padding: 12px; border-radius: 8px; margin-bottom: 10px; 
+                        {% if message.tags == 'error' %}background: #fee2e2; color: #991b1b;
+                        {% elif message.tags == 'warning' %}background: #fef3c7; color: #92400e;
+                        {% else %}background: #d1fae5; color: #065f46;{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Statistiques -->
+        <div class="stats-cards">
+            <div class="stat-card">
+                <h3>Total Incidents</h3>
+                <div class="value">{{ incidents.count }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Ouverts</h3>
+                <div class="value">{{ incidents|length|add:"0" }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>En cours</h3>
+                <div class="value">{{ incidents|length|add:"0" }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Résolus</h3>
+                <div class="value">{{ incidents|length|add:"0" }}</div>
+            </div>
+        </div>
+
+        <!-- Filtres -->
+        <div class="filters-bar">
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Statut:</label>
+                <select name="statut" id="statut-filter" style="width: 100%;">
+                    <option value="">Tous les statuts</option>
+                    <option value="ouvert" {% if statut_filter == 'ouvert' %}selected{% endif %}>Ouvert</option>
+                    <option value="en_cours" {% if statut_filter == 'en_cours' %}selected{% endif %}>En cours</option>
+                    <option value="resolu" {% if statut_filter == 'resolu' %}selected{% endif %}>Résolu</option>
+                    <option value="ferme" {% if statut_filter == 'ferme' %}selected{% endif %}>Fermé</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Opérateur:</label>
+                <select name="operateur" id="operateur-filter" style="width: 100%;">
+                    <option value="">Tous les opérateurs</option>
+                    {% for op in operateurs %}
+                        <option value="{{ op.id }}" {% if operateur_filter == op.id|stringformat:"s" %}selected{% endif %}>
+                            {{ op.nom }} (Op. {{ op.ordre_escalade }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <button onclick="appliquerFiltres()">Filtrer</button>
+                <button onclick="resetFiltres()" style="background: #6c757d;">Réinitialiser</button>
+            </div>
+        </div>
+
+        <!-- Tableau des incidents -->
+        <div class="incidents-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Température</th>
+                        <th>Statut</th>
+                        <th>Opérateur</th>
+                        <th>Date création</th>
+                        <th>Tentatives</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for incident in incidents %}
+                    {% if operateur_connecte and incident.operateur_actuel == operateur_connecte %}
+                        {% with peut_modifier=True %}
+                    {% else %}
+                        {% with peut_modifier=False %}
+                    {% endif %}
+                    <tr style="{% if peut_modifier %}background: #eff6ff; border-left: 4px solid #2563eb;{% endif %}">
+                        <td><strong>#{{ incident.id }}</strong></td>
+                        <td>
+                            <span class="badge-type badge-{{ incident.type_incident }}">
+                                {{ incident.get_type_incident_display }}
+                            </span>
+                        </td>
+                        <td><strong>{{ incident.temperature }}°C</strong></td>
+                        <td>
+                            <span class="badge-statut badge-{{ incident.statut }}">
+                                {{ incident.get_statut_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if incident.operateur_actuel %}
+                                <div>
+                                    <strong>{{ incident.operateur_actuel.nom }}</strong> (Op. {{ incident.operateur_actuel.ordre_escalade }})
+                                    {% if operateur_connecte %}
+                                        {% if incident.operateur_actuel == operateur_connecte %}
+                                            <br><span style="color: #16a34a; font-size: 0.85rem; font-weight: bold;">✓ Vous êtes assigné - Vous pouvez modifier</span>
+                                        {% else %}
+                                            <br><span style="color: #dc2626; font-size: 0.85rem;">✗ Assigné à un autre opérateur - Vous ne pouvez pas modifier</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span style="color: #9ca3af;">Non assigné</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ incident.date_creation|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <small>
+                                Op1: <strong>{{ incident.tentatives_operateur1 }}/3</strong> | 
+                                Op2: <strong>{{ incident.tentatives_operateur2 }}/3</strong> | 
+                                Op3: <strong>{{ incident.tentatives_operateur3 }}/3</strong>
+                            </small>
+                        </td>
+                        <td>
+                            <a href="{% url 'detail_incident' incident.id %}" class="btn-action btn-view">Voir</a>
+                            {% if peut_modifier %}
+                                <span style="color: #16a34a; font-size: 0.8rem; display: block; margin-top: 4px; font-weight: bold;">✓ Modifiable</span>
+                            {% elif operateur_connecte %}
+                                <span style="color: #dc2626; font-size: 0.8rem; display: block; margin-top: 4px;">✗ Non modifiable</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: #6b7280;">
+                            Aucun incident trouvé.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function appliquerFiltres() {
+            const statut = document.getElementById('statut-filter').value;
+            const operateur = document.getElementById('operateur-filter').value;
+            const params = new URLSearchParams();
+            if (statut) params.append('statut', statut);
+            if (operateur) params.append('operateur', operateur);
+            window.location.href = '{% url "liste_incidents" %}?' + params.toString();
+        }
+        
+        function resetFiltres() {
+            window.location.href = '{% url "liste_incidents" %}';
+        }
+    </script>
+</body>
+</html>
+

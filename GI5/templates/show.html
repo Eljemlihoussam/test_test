@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DHT Sensor Data</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f5f5f5; text-align: center; margin-top: 80px; }
+        .card {
+            background: white;
+            padding: 40px;
+            margin: auto;
+            width: 320px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h2 { margin-bottom: 20px; }
+        p { font-size: 18px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🌡️ DHT11 Sensor Data</h2>
+        {% if data %}
+            <p><strong>Temperature:</strong> {{ data.temp }} °C</p>
+            <p><strong>Humidity:</strong> {{ data.hum }} %</p>
+            <p><em>Updated at:</em> {{ data.dt }}</p>
+        {% else %}
+            <p>No data available yet.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

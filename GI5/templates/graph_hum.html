@@ -1,0 +1,72 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Historique Humidité</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="nav-links">
+        <a href="{% url 'dashboard' %}">← Retour au dashboard</a>
+        {% if user.is_authenticated %}
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'admin:index' %}">Interface Admin</a>
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'logout' %}" style="color: #dc2626;">Déconnexion</a>
+        {% else %}
+            <span style="margin: 0 10px;">|</span>
+            <a href="{% url 'login' %}">Connexion Admin</a>
+        {% endif %}
+    </div>
+    <h2>Historique Humidité</h2>
+    <div class="filters">
+        <label>Début: <input type="date" id="start"></label>
+        <label>Fin: <input type="date" id="end"></label>
+        <button id="load-btn">Charger</button>
+    </div>
+    <canvas id="chart" height="120"></canvas>
+
+    <script>
+        let chart;
+        async function loadData() {
+            const start = document.getElementById("start").value;
+            const end = document.getElementById("end").value;
+            const params = new URLSearchParams();
+            if (start) params.append("start", start);
+            if (end) params.append("end", end);
+            const res = await fetch("/api/?" + params.toString());
+            const data = await res.json();
+            const labels = data.data.map(d => new Date(d.dt).toLocaleString());
+            const hums = data.data.map(d => d.hum);
+
+            if (chart) chart.destroy();
+            const ctx = document.getElementById("chart");
+            chart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels,
+                    datasets: [{
+                        label: "Humidité (%)",
+                        data: hums,
+                        borderColor: "rgba(54,162,235,1)",
+                        backgroundColor: "rgba(54,162,235,0.1)",
+                        tension: 0.2,
+                        pointRadius: 3
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: { title: { display: true, text: "%" } },
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } }
+                    }
+                }
+            });
+        }
+        document.getElementById("load-btn").addEventListener("click", loadData);
+        loadData();
+    </script>
+</body>
+</html>
+
